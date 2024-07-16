@@ -27,7 +27,7 @@ def boundary_r(x, on_boundary):
 
 # Analytical solution for comparison
 def func(x):
-    return -(x ** 4) / 24 + x ** 3 / 6 - x ** 2 / 4
+    return -(x ** 4) / 24 + x ** 3 / 12 - x ** 2 / 24
 
 # Define boundary conditions
 bc1 = dde.icbc.DirichletBC(geom, lambda x: 0, boundary_l)  # y(0) = 0
@@ -57,10 +57,10 @@ model = dde.Model(data, net)
 model.compile("adam", lr=0.001, metrics=["l2 relative error"])
 
 # Train the model
-losshistory, train_state = model.train(iterations=10000)
+losshistory, train_state = model.train(iterations=20000)
 
 # Plotting the results
-X = geom.uniform_points(1000, True)  # Generate uniform points in the domain for predictions
+X = geom.uniform_points(100, True)  # Generate uniform points in the domain for predictions
 y_pred = model.predict(X)  # Predict the deflection using the trained model
 y_exact = func(X)  # Compute the exact solution for comparison
 
@@ -72,4 +72,6 @@ plt.xlabel("x")
 plt.ylabel("Deflection")
 plt.legend()
 plt.title("Euler-Bernoulli Beam Deflection (Both Ends Fixed)")
+plt.xlim(0, 1)
+plt.ylim(-0.003,0.001 )
 plt.show()

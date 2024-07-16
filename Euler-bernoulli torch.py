@@ -38,6 +38,82 @@ x_test = torch.linspace(0,6000,300).view(-1,1)
 u_exact = exact_solution(L, E, I, q, x_test)
 
 plt.plot(x_test[:,0], u_exact[:,0], label="Exact solution", color="tab:grey", alpha=0.6)
+#%% v2
+L = 1        # mm
+E = 1       # GPa
+I = 1  # mm^4
+q = -1     # kN/mm
+
+x_test = torch.linspace(0,1,300).view(-1,1)
+u_exact = exact_solution(L, E, I, q, x_test)
+
+plt.plot(x_test[:,0], u_exact[:,0], label="Exact solution", color="tab:grey", alpha=0.6)
+#%% v2
+
+# define a neural network to train
+# TODO: write code here
+pinn = FCN(1,1,64,3)
+
+# define boundary points, for the boundary loss
+# TODO: write code here
+x_bc0 = torch.tensor(0.).view(-1,1).requires_grad_(True)
+x_bcL = torch.tensor(1.).view(-1,1).requires_grad_(True)
+
+# define training points over the entire domain, for the physics loss
+# TODO: write code here
+x_physics = torch.linspace(0,1,30).view(-1,1).requires_grad_(True)
+
+# train the PINN
+x_test = torch.linspace(0,1,300).view(-1,1)
+u_exact = exact_solution(L, E, I, q, x_test)
+optimiser = torch.optim.Adam(pinn.parameters(),lr=1e-3)
+
+iteration = 20001
+
+for i in range(iteration):
+    optimiser.zero_grad()
+
+    # compute boundary loss at x = 0
+    u = pinn(x_bc0) # (1,1)
+    loss1 = (torch.squeeze(u) - 0)**2
+
+    dudt = torch.autograd.grad(u, x_bc0, torch.ones_like(u), create_graph=True)[0]
+    loss2 = (torch.squeeze(dudt) - 0)**2
+
+    # compute boundary loss at x = L
+    u = pinn(x_bcL) # (1,1)
+    loss3 = (torch.squeeze(u) - 0)**2
+
+    dudt = torch.autograd.grad(u, x_bcL, torch.ones_like(u), create_graph=True)[0]
+    loss4 = (torch.squeeze(dudt) - 0)**2
+    
+    # compute physics loss
+    u = pinn(x_physics)
+    dudt = torch.autograd.grad(u, x_physics, torch.ones_like(u), create_graph=True)[0]
+    d2udt2 = torch.autograd.grad(dudt, x_physics, torch.ones_like(dudt), create_graph=True)[0]
+    d3udt3 = torch.autograd.grad(d2udt2, x_physics, torch.ones_like(dudt), create_graph=True)[0]
+    d4udt4 = torch.autograd.grad(d3udt3, x_physics, torch.ones_like(dudt), create_graph=True)[0]
+    loss5 = torch.mean((E*I*d4udt4 - q )**2)
+    
+    # backpropagate joint loss, take optimiser step
+    loss = loss1 + loss2 + loss3 + loss4 + loss5
+    loss.backward()
+    optimiser.step()
+
+    # plot the result as training progresses
+    if i % 2000 == 0:
+        #print(u.abs().mean().item(), dudt.abs().mean().item(), d2udt2.abs().mean().item())
+        u = pinn(x_test).detach()
+        plt.figure(figsize=(6,2.5))
+        plt.scatter(x_physics.detach()[:,0],
+                    torch.zeros_like(x_physics)[:,0], s=20, lw=0, color="tab:green", alpha=0.6)
+        plt.plot(x_test[:,0], u_exact[:,0], label="Exact solution", color="tab:grey", alpha=0.6)
+        plt.plot(x_test[:,0], u[:,0], label="PINN solution", color="tab:green")
+        plt.title(f"Training step {i}")
+        #plt.legend()
+        plt.xlim(0, 1)
+        plt.ylim(-0.003,0.001 )
+        plt.show()
 #%%
 
 # define a neural network to train
@@ -113,7 +189,9 @@ for i in range(iteration):
         plt.plot(x_test[:,0], u_exact[:,0], label="Exact solution", color="tab:grey", alpha=0.6)
         plt.plot(x_test[:,0], u[:,0], label="PINN solution", color="tab:green")
         plt.title(f"Training step {i}")
-        plt.legend()
+        #plt.legend()
+        plt.xlim(0, 1)
+        plt.ylim(-0.003,0.001 )
         plt.show()
 #%%
 # Plot the losses
